@@ -1,0 +1,12 @@
+<view class="item" wx:for="0123456789" wx:key="{{index}}">
+    <view class="media">
+      <image mode='widthFix' class="img" src="/images/book-{{index+1}}.jpg"></image>
+    </view>
+    <view class="info">
+      <text class="title">霸道总裁 {{index+1}}</text>
+      <view class="text">
+        <text>更新至 {{index+ 121}} 集</text>
+      </view>
+    </view>
+    <view class="arrow"></view>
+</view>

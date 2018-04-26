@@ -205,7 +205,7 @@ function getCdlistInfo(id, callback) {
     method: 'GET',
     header: { 'content-type': 'application/json' },
     success: function (res) {
-      if (res.statusCode == 200) {
+      if (res.statusCode == 200 && res.data.cdlist) {
         var data = res.data;
         var cdlist = data.cdlist;
         for (var i = 0; i < cdlist.length; i++) {

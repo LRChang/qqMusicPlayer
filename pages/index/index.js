@@ -5,24 +5,30 @@ var that;
 Page({
   data: {
     navbar: [
-      '推荐', '排行榜', '搜索'
+      '首页', '分类', '搜索', '我的'
     ],
     currentTab: 0, // 导航栏切换索引
+
+    stv: {
+      windowWidth: 0,
+      lineWidth: 0,
+      offset: 0,
+      tStart: false
+    },
+
+    transClassArr: ['tanslate0', 'tanslate1', 'tanslate2', 'tanslate3', 'tanslate4', 'tanslate5'],
+    currentMenuIndex: 0,
+
     slider: [],
     radioList: [],
     songList: [],
-    topList: [],
+
     scrollviewH: 0, // 搜索结果的scrollview高度
 
-    inputFocus: false, // 搜索框是否获取焦点
     searchKeyword: "", // 搜索关键词
-    searchHotShow: true, // 是否显示热门搜索
-    searchHistoryShow: false, // 是否显示搜索历史
     searchResultShow: false, // 是否显示搜索结果
     searchCancelShow: false, // 是否显示取消按钮
 
-    searchHistorys: [], // 搜索历史记录
-    searchSongList: [], // 搜索结果
     searchPageNum: 1, // 分页数
     searchLoading: false, // 加载更多
     searchLoadingComplete: false, // 加载更多结束
@@ -34,21 +40,114 @@ Page({
     backToTop: false, // 返回顶部
     
   },
+
+  /*切换分类*/
+  changeCategory: function (event) {
+    console.log(event);
+    var index = event.currentTarget.dataset.index;
+    this.setData({
+      currentMenuIndex: index
+    });
+
+    //如果数据是第一次请求
+    // if (!this.isLoadedData(index)) {
+    //   var that = this;
+    //   this.getProductsByCategory(id, (data) => {
+    //     that.setData(that.getDataObjForBind(index, data));
+    //   });
+    // }
+  },
+
+  _updateSelectedPage(page) {
+    let { navbar, stv, currentTab } = this.data;
+    currentTab = page;
+    this.setData({ currentTab: currentTab });
+    stv.offset = stv.windowWidth * currentTab;
+    this.setData({ stv: this.data.stv });
+  },
+
+  // 导航栏操作
+  onNavbarTap: function (e) {
+    // this.setData({currentTab: ev.currentTarget.dataset.index});
+    this._updateSelectedPage(e.currentTarget.dataset.index);
+  },
+
+  _initNavbar: function(){
+    try {
+      let { navbar } = this.data;
+      var res = wx.getSystemInfoSync()
+      this.windowWidth = res.windowWidth;
+      this.data.stv.lineWidth = this.windowWidth / this.data.navbar.length;
+      this.data.stv.windowWidth = res.windowWidth;
+      this.setData({ stv: this.data.stv })
+      this.navbarCount = navbar.length;
+    } catch (e) {}
+  },
+
+  handlerStart(e) {
+    let { clientX, clientY } = e.touches[0];
+    this.startX = clientX;
+    this.tapStartX = clientX;
+    this.tapStartY = clientY;
+    this.data.stv.tStart = true;
+    this.tapStartTime = e.timeStamp;
+    this.setData({ stv: this.data.stv })
+  },
+  handlerMove(e) {
+    let { clientX, clientY } = e.touches[0];
+    let { stv } = this.data;
+    let offsetX = this.startX - clientX;
+    this.startX = clientX;
+    stv.offset += offsetX;
+    if (stv.offset <= 0) {
+      stv.offset = 0;
+    } else if (stv.offset >= stv.windowWidth * (this.navbarCount - 1)) {
+      stv.offset = stv.windowWidth * (this.navbarCount - 1);
+    }
+    this.setData({ stv: stv });
+  },
+  handlerCancel(e) {
+
+  },
+  handlerEnd(e) {
+    let { clientX, clientY } = e.changedTouches[0];
+    let endTime = e.timeStamp;
+    let { navbar, stv, currentTab } = this.data;
+    let { offset, windowWidth } = stv;
+    var dragDistance = this.tapStartX - clientX;
+
+    var isVertical = false;
+    if (Math.abs(this.tapStartY - clientY) > 60){
+      isVertical = true;
+    }
+    console.log("Y: " +Math.abs(this.tapStartY - clientY))
+    console.log("X: " + dragDistance);
+
+    if (!isVertical && Math.abs(dragDistance) > 20 && dragDistance < 0 && currentTab > 0) {
+      currentTab--;
+    } else if (!isVertical && Math.abs(dragDistance) > 30 && dragDistance > 0 && currentTab < (navbar.length -1)){
+      currentTab++;
+    }
+
+    this.setData({ currentTab: currentTab });
+
+    stv.offset = stv.windowWidth * currentTab;
+    stv.tStart = false;
+    this.setData({ stv: this.data.stv });
+  },
+
   onLoad: function (options) {
     that = this;
+    that._initNavbar();
+
+    return;
     wx.showLoading({title: '数据加载中...', mask: true});
     //推荐频道 热门歌单
     util.getRecommend(function (data) {
       wx.hideLoading();
       that.setData({slider: data.data.slider, radioList: data.data.radioList, songList: data.data.songList});
     });
-    //排行榜数据
-    util.getToplist(function (data) {
-      // 过滤巅峰mv榜
-      that.setData({
-        topList: data.filter((item, i) => item.id != 201)
-      });
-    });
+    
     //搜索频道 热门搜索
     util.getHotSearch(function (data) {
       that.setData({hotkey: data.data.hotkey, special: data.data.special_key});
@@ -61,124 +160,16 @@ Page({
         });
       }
     });
-
-    // 历史浏览记录 从本地缓存中获取前10条数据
-    var searchHistorys = wx.getStorageSync('searchHistorys') || [];
-    if (searchHistorys.length > 0) {
-      that.setData({
-        searchHistorys: searchHistorys.length >= 10
-          ? searchHistorys.slice(0, 10)
-          : searchHistorys
-      });
-    }
-  },
-  // 导航栏操作
-  onNavbarTap: function (ev) {
-    this.setData({currentTab: ev.currentTarget.dataset.index});
-  },
-  // 搜索框获取焦点
-  onSearchFocus: function (ev) {
-    var searchKeyword = that.data.searchKeyword;
-    if (searchKeyword.trim()) {
-      that.setData({searchHotShow: false, searchHistoryShow: false, searchResultShow: true, searchCancelShow: true});
-    } else {
-      that.setData({searchHotShow: false, searchHistoryShow: true, searchResultShow: false, searchCancelShow: true});
-    }
-
   },
   // 搜索取消
   onSearchCancel: function () {
     that.setData({
-      searchHotShow: true,
-      searchHistoryShow: false,
-      searchResultShow: false,
-      searchCancelShow: false,
       searchKeyword: '',
-      inputFocus: false
     });
   },
   // 搜索输入值时的操作
   onSearchInput: function (ev) {
     that.setData({searchKeyword: ev.detail.value});
-  },
-  // 搜索框清除按钮
-  onClearInput: function () {
-    that.setData({
-      searchHotShow: false,
-      searchHistoryShow: true,
-      searchResultShow: false,
-      searchCancelShow: true,
-      searchKeyword: '',
-      inputFocus: true
-    });
-  },
-  // 搜索确认搜索
-  onSearchConfirm: function (ev) {
-    var searchKeyword = ev.detail.value;
-    var searchHistorys = that.data.searchHistorys;
-    that.setData({searchKeyword: searchKeyword});
-    if (searchKeyword.trim()) {
-      // 添加搜索历史记录
-      if (searchHistorys.length > 0) {
-        if (searchHistorys.indexOf(searchKeyword) < 0) {
-          searchHistorys.unshift(searchKeyword);
-        }
-      } else {
-        searchHistorys.push(searchKeyword);
-      }
-      wx.setStorage({
-        key: "searchHistorysKey",
-        data: searchHistorys,
-        success: function () {
-          that.setData({searchHistorys: searchHistorys});
-        }
-      });
-
-      this.setData({searchHotShow: false, searchHistoryShow: false, searchResultShow: true, searchSongList: []});
-      this.onFetchSearchList(1);
-    }
-  },
-  // 搜索结果
-  onFetchSearchList: function (searchPageNum) {
-    var searchKeyword = that.data.searchKeyword;
-    that.setData({searchLoading: true, scrollFlag: false});
-    util.getSearchMusic(searchKeyword, searchPageNum, function (res) {
-      var res = res.data;
-      that.setData({
-        searchSongList: that
-          .data
-          .searchSongList
-          .concat(res.song.list),
-        zhida: res.zhida,
-        searchLoading: false,
-        searchPageNum: res.song.curpage,
-        searchTotalNum: res.song.totalnum,
-        searchPageSize: res.song.curnum,
-        scrollFlag: true
-      });
-    });
-  },
-  // 删除单条历史记录
-  onSearchHistoryDelete: function (ev) {
-    var item = ev.currentTarget.dataset.item;
-    var searchHistorys = wx.getStorageSync('searchHistorysKey');
-    searchHistorys.splice(searchHistorys.indexOf(item), 1);
-    wx.setStorage({
-      key: "searchHistorysKey",
-      data: searchHistorys,
-      success: function () {
-        that.setData({searchHistorys: searchHistorys});
-      }
-    });
-  },
-  // 清除所有历史记录
-  onSearchHistoryDeleteAll: function () {
-    wx.removeStorage({
-      key: 'searchHistorysKey',
-      success: function (res) {
-        that.setData({searchHistorys: []});
-      }
-    });
   },
   // 滚动分页加载
   onScrollLower: function () {
@@ -208,41 +199,13 @@ Page({
       that.setData({backToTop: false});
     }
   },
-  // 返回顶部
-  onBackToTop: function () {
-    that.setData({scrollToView: 'scrollTop', backToTop: false});
-  },
+
   // 跳转到cdlist
   onCdlistTap: function (ev) {
     var id = ev.currentTarget.dataset.id;
     wx.navigateTo({
       url: '../cdlist/cdlist?cdListId=' + id
     });
-  },
-  // 跳到到toplist
-  onToplistTap: function (ev) {
-    var id = ev.currentTarget.dataset.id;
-    wx.navigateTo({
-      url: '../toplist/toplist?topListId=' + id
-    });
-  },
-  // 热门搜索点击执行搜索
-  onHotkeyTap: function (ev) {
-    var word = ev.currentTarget.dataset.text;
-    this.setData({
-      searchSongList: [],
-      searchHotShow: false,
-      searchHistoryShow: false,
-      searchResultShow: true,
-      searchCancelShow: true,
-      searchKeyword: ev
-        .currentTarget
-        .dataset
-        .text
-        .trim(),
-      inputFocus: false
-    });
-    this.onFetchSearchList(1);
   },
   // 搜索结果跳到播放页
   onPlaysongTap: function (ev) {
@@ -254,13 +217,6 @@ Page({
     wx.navigateTo({
       url: '../playsong/playsong?id=' + id + '&mid=' + mid + "&albummid=" + albummid + '&songFrom=' + songFrom
     });
-  },
-  onShareAppMessage: function() {
-    // 用户点击右上角分享
-    return {
-      title: 'QQ音乐，陪伴你每一天', // 分享标题
-      desc: '这是julytian制作的QQ音乐微信小程序', // 分享描述
-      path: '/pages/index/index' // 分享路径
-    }
   }
+
 });

@@ -1,14 +1,15 @@
 {
   "pages": [
     "pages/index/index",
+    "pages/booklist/booklist",    
     "pages/toplist/toplist",
     "pages/playsong/playsong",
     "pages/cdlist/cdlist"
   ],
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#31c27c",
-    "navigationBarTitleText": "QQ音乐H5",
+    "navigationBarBackgroundColor": "#6cd1d9",
+    "navigationBarTitleText": "海潮知音",
     "navigationBarTextStyle": "#fff",
     "enablePullDownRefresh": false
   }
